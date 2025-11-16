@@ -1,0 +1,227 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Products (Shoe Models)
+model Product {
+  id          String    @id @default(uuid())
+  modelName   String    @map("model_name")
+  description String?
+  basePrice   Decimal   @map("base_price") @db.Decimal(10, 2)
+  imageUrl    String?   @map("image_url")
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  variants    ProductVariant[]
+
+  @@map("products")
+}
+
+// Product Variants (Size + Color combinations)
+model ProductVariant {
+  id        String   @id @default(uuid())
+  productId String   @map("product_id")
+  size      String
+  color     String
+  sku       String   @unique  // Auto-generated: modelname-size-color
+  barcode   String?  @unique
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  product           Product              @relation(fields: [productId], references: [id], onDelete: Cascade)
+  inventory         Inventory?
+  orderItems        OrderItem[]
+  channelListings   ChannelListing[]
+  transactions      InventoryTransaction[]
+
+  @@unique([productId, size, color])
+  @@index([productId])
+  @@index([sku])
+  @@map("product_variants")
+}
+
+// Inventory tracking
+model Inventory {
+  id                  String   @id @default(uuid())
+  variantId           String   @unique @map("variant_id")
+  quantityAvailable   Int      @default(0) @map("quantity_available")
+  quantityReserved    Int      @default(0) @map("quantity_reserved")
+  quantitySold        Int      @default(0) @map("quantity_sold")
+  minStockThreshold   Int      @default(5) @map("min_stock_threshold")
+  warehouseLocation   String?  @map("warehouse_location")
+  lastRestockedAt     DateTime? @map("last_restocked_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@index([variantId])
+  @@map("inventory")
+}
+
+// Sales Channels (Mercado Libre, Shopify, etc.)
+model SalesChannel {
+  id              String   @id @default(uuid())
+  name            String   @unique  // 'mercadolibre', 'shopify', 'amazon', 'shein'
+  displayName     String   @map("display_name")
+  isActive        Boolean  @default(true) @map("is_active")
+  apiCredentials  Json?    @map("api_credentials")  // Encrypted credentials
+  config          Json?    // Channel-specific configuration
+  lastSyncedAt    DateTime? @map("last_synced_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  listings  ChannelListing[]
+  orders    Order[]
+  syncQueue SyncQueue[]
+
+  @@map("sales_channels")
+}
+
+// Products listed on each channel
+model ChannelListing {
+  id            String    @id @default(uuid())
+  variantId     String    @map("variant_id")
+  channelId     String    @map("channel_id")
+  externalId    String?   @map("external_id")  // Channel's product ID
+  channelSku    String?   @map("channel_sku")
+  price         Decimal   @db.Decimal(10, 2)
+  isActive      Boolean   @default(true) @map("is_active")
+  lastSyncedAt  DateTime? @map("last_synced_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  channel SalesChannel   @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@unique([variantId, channelId])
+  @@index([channelId])
+  @@index([externalId])
+  @@map("channel_listings")
+}
+
+// Orders from all channels
+model Order {
+  id              String      @id @default(uuid())
+  channelId       String      @map("channel_id")
+  externalOrderId String      @map("external_order_id")
+  status          OrderStatus @default(PENDING)
+  totalAmount     Decimal     @map("total_amount") @db.Decimal(10, 2)
+  customerInfo    Json?       @map("customer_info")  // Name, email, address, etc.
+  notes           String?
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+
+  channel SalesChannel @relation(fields: [channelId], references: [id])
+  items   OrderItem[]
+
+  @@unique([channelId, externalOrderId])
+  @@index([channelId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("orders")
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  RETURNED
+}
+
+// Order line items
+model OrderItem {
+  id         String  @id @default(uuid())
+  orderId    String  @map("order_id")
+  variantId  String  @map("variant_id")
+  quantity   Int
+  unitPrice  Decimal @map("unit_price") @db.Decimal(10, 2)
+  subtotal   Decimal @db.Decimal(10, 2)
+
+  order   Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  variant ProductVariant @relation(fields: [variantId], references: [id])
+
+  @@index([orderId])
+  @@index([variantId])
+  @@map("order_items")
+}
+
+// Audit log for inventory changes
+model InventoryTransaction {
+  id              String            @id @default(uuid())
+  variantId       String            @map("variant_id")
+  transactionType TransactionType   @map("transaction_type")
+  quantityChange  Int               @map("quantity_change")  // Positive or negative
+  referenceType   String?           @map("reference_type")   // 'order', 'manual', 'return'
+  referenceId     String?           @map("reference_id")
+  notes           String?
+  createdBy       String?           @map("created_by")  // User ID if manual adjustment
+  createdAt       DateTime          @default(now()) @map("created_at")
+
+  variant ProductVariant @relation(fields: [variantId], references: [id])
+
+  @@index([variantId])
+  @@index([createdAt])
+  @@map("inventory_transactions")
+}
+
+enum TransactionType {
+  SALE
+  RETURN
+  ADJUSTMENT
+  RESTOCK
+}
+
+// Queue for syncing with channels
+model SyncQueue {
+  id          String     @id @default(uuid())
+  variantId   String?    @map("variant_id")
+  channelId   String     @map("channel_id")
+  action      SyncAction
+  payload     Json
+  status      SyncStatus @default(PENDING)
+  retryCount  Int        @default(0) @map("retry_count")
+  errorMessage String?   @map("error_message")
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+  processedAt DateTime?  @map("processed_at")
+
+  channel SalesChannel @relation(fields: [channelId], references: [id])
+
+  @@index([status])
+  @@index([channelId])
+  @@index([createdAt])
+  @@map("sync_queue")
+}
+
+enum SyncAction {
+  UPDATE_STOCK
+  UPDATE_PRICE
+  CREATE_LISTING
+  DELETE_LISTING
+}
+
+enum SyncStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+// Track processed webhooks to prevent duplicates
+model ProcessedWebhook {
+  id          String   @id @default(uuid())
+  webhookId   String   @unique @map("webhook_id")
+  channelId   String   @map("channel_id")
+  processedAt DateTime @default(now()) @map("processed_at")
+
+  @@index([webhookId])
+  @@map("processed_webhooks")
+}
