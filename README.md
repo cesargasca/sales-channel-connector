@@ -81,7 +81,28 @@ shoe-inventory/
 - Node.js 18+ and npm
 - Docker and Docker Compose (for PostgreSQL)
 
-### Installation
+### Quick Setup (Recommended)
+
+Run the automated setup script:
+
+```bash
+chmod +x setup.sh
+./setup.sh
+```
+
+This script will:
+- Create your `.env` file from `.env.example`
+- Install dependencies
+- Start PostgreSQL with Docker
+- Run database migrations
+- Seed the database with sample data
+
+Then start the development server:
+```bash
+npm run dev
+```
+
+### Manual Installation
 
 1. **Clone the repository**
    ```bash
@@ -406,6 +427,75 @@ await prisma.inventory.findMany({
     }
   }
 })
+```
+
+## Troubleshooting
+
+### Error: Environment variable not found: DATABASE_URL
+
+**Problem:** When running `npm run db:seed` or other Prisma commands, you get:
+```
+Error: Environment variable not found: DATABASE_URL.
+  -->  schema.prisma:7
+```
+
+**Solution:** You need to create a `.env` file with your database connection string.
+
+1. **Quick fix:**
+   ```bash
+   cp .env.example .env
+   ```
+
+2. **Or run the setup script:**
+   ```bash
+   ./setup.sh
+   ```
+
+3. **Verify the file exists:**
+   ```bash
+   cat .env
+   ```
+
+The `.env` file should contain:
+```
+DATABASE_URL="postgresql://admin:admin123@localhost:5432/shoe_inventory?schema=public"
+```
+
+### Database Connection Failed
+
+**Problem:** Can't connect to PostgreSQL
+
+**Solutions:**
+1. Make sure Docker is running
+2. Start PostgreSQL:
+   ```bash
+   docker-compose up -d
+   ```
+3. Check if PostgreSQL is running:
+   ```bash
+   docker-compose ps
+   ```
+
+### Prisma Client Not Generated
+
+**Problem:** Import errors for `@prisma/client`
+
+**Solution:**
+```bash
+npm run db:generate
+```
+
+### Migration Errors
+
+**Problem:** Database schema is out of sync
+
+**Solution:**
+```bash
+# For development (WARNING: may lose data)
+npm run db:push
+
+# For production
+npm run db:migrate
 ```
 
 ## Contributing
