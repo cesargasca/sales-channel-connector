@@ -14,7 +14,7 @@ graph TB
     subgraph "Next.js Application"
         subgraph "Frontend Layer"
             UI[React UI Components]
-            Pages[Next.js Pages/Routes]
+            Pages[Next.js Pages Routes]
         end
         
         subgraph "API Layer"
@@ -48,11 +48,10 @@ graph TB
         Worker[Background Worker]
     end
     
-    subgraph "Cache Layer - Optional"
+    subgraph "Cache Layer Optional"
         Redis[(Redis Cache)]
     end
     
-    %% External channel connections
     ML -->|Webhooks| WH
     SH -->|Webhooks| WH
     SP -->|Webhooks| WH
@@ -63,12 +62,10 @@ graph TB
     SPA -->|API Calls| SP
     AZA -->|API Calls| AZ
     
-    %% Frontend to API
     UI --> Pages
     Pages --> API
     Pages --> SA
     
-    %% API to Services
     API --> IS
     API --> CS
     API --> OS
@@ -77,26 +74,22 @@ graph TB
     SA --> OS
     WH --> OS
     
-    %% Services to Integrations
     CS --> BA
     BA --> MLA
     BA --> SHA
     BA --> SPA
     BA --> AZA
     
-    %% Services to Database
     IS --> PrismaClient
     CS --> PrismaClient
     OS --> PrismaClient
     PrismaClient --> PostgreSQL
     
-    %% Background Processing
     CS --> Queue
     Queue --> Worker
     Worker --> BA
     Worker --> PrismaClient
     
-    %% Cache
     IS -.->|Optional| Redis
     CS -.->|Optional| Redis
     
@@ -116,13 +109,13 @@ graph TB
 erDiagram
     PRODUCT ||--o{ PRODUCT_VARIANT : has
     PRODUCT_VARIANT ||--|| INVENTORY : tracks
-    PRODUCT_VARIANT ||--o{ CHANNEL_LISTING : "listed on"
-    PRODUCT_VARIANT ||--o{ ORDER_ITEM : "ordered as"
-    PRODUCT_VARIANT ||--o{ INVENTORY_TRANSACTION : "has history"
+    PRODUCT_VARIANT ||--o{ CHANNEL_LISTING : listed_on
+    PRODUCT_VARIANT ||--o{ ORDER_ITEM : ordered_as
+    PRODUCT_VARIANT ||--o{ INVENTORY_TRANSACTION : has_history
     
     SALES_CHANNEL ||--o{ CHANNEL_LISTING : contains
     SALES_CHANNEL ||--o{ ORDER : receives
-    SALES_CHANNEL ||--o{ SYNC_QUEUE : "queues for"
+    SALES_CHANNEL ||--o{ SYNC_QUEUE : queues_for
     
     ORDER ||--o{ ORDER_ITEM : contains
     
@@ -142,7 +135,7 @@ erDiagram
         uuid product_id FK
         string size
         string color
-        string sku UK "model-size-color"
+        string sku UK
         string barcode UK
         timestamp created_at
         timestamp updated_at
@@ -150,7 +143,7 @@ erDiagram
     
     INVENTORY {
         uuid id PK
-        uuid variant_id FK-UK
+        uuid variant_id FK
         int quantity_available
         int quantity_reserved
         int quantity_sold
@@ -162,10 +155,10 @@ erDiagram
     
     SALES_CHANNEL {
         uuid id PK
-        string name UK "mercadolibre"
+        string name UK
         string display_name
         boolean is_active
-        jsonb api_credentials "encrypted"
+        jsonb api_credentials
         jsonb config
         timestamp last_synced_at
         timestamp created_at
@@ -176,7 +169,7 @@ erDiagram
         uuid id PK
         uuid variant_id FK
         uuid channel_id FK
-        string external_id "channel's product id"
+        string external_id
         string channel_sku
         decimal price
         boolean is_active
@@ -189,7 +182,7 @@ erDiagram
         uuid id PK
         uuid channel_id FK
         string external_order_id
-        enum status "PENDING|CONFIRMED|SHIPPED|etc"
+        enum status
         decimal total_amount
         jsonb customer_info
         text notes
@@ -209,12 +202,12 @@ erDiagram
     INVENTORY_TRANSACTION {
         uuid id PK
         uuid variant_id FK
-        enum transaction_type "SALE|RETURN|ADJUSTMENT|RESTOCK"
-        int quantity_change "positive or negative"
-        string reference_type "order|manual|return"
+        enum transaction_type
+        int quantity_change
+        string reference_type
         uuid reference_id
         text notes
-        uuid created_by "user_id"
+        uuid created_by
         timestamp created_at
     }
     
@@ -222,9 +215,9 @@ erDiagram
         uuid id PK
         uuid variant_id FK
         uuid channel_id FK
-        enum action "UPDATE_STOCK|UPDATE_PRICE|etc"
+        enum action
         jsonb payload
-        enum status "PENDING|PROCESSING|COMPLETED|FAILED"
+        enum status
         int retry_count
         text error_message
         timestamp created_at
@@ -246,7 +239,7 @@ sequenceDiagram
     participant Queue as Sync Queue
     participant Adapter as Channel Adapter
     
-    Channel->>Webhook: POST /api/webhooks/shopify
+    Channel->>Webhook: POST webhook with order
     Note over Webhook: Webhook payload with order
     
     Webhook->>DB: Check if webhook already processed
@@ -260,7 +253,7 @@ sequenceDiagram
     
     loop For each order item
         OrderService->>InventoryService: reserveStock(variantId, quantity)
-        InventoryService->>DB: Lock inventory row (FOR UPDATE)
+        InventoryService->>DB: Lock inventory row
         InventoryService->>DB: Check availability
         
         alt Sufficient stock
@@ -318,49 +311,49 @@ graph TB
     subgraph "Next.js App Router Structure"
         Root[app/layout.tsx]
         
-        subgraph "Dashboard Routes - (dashboard)"
-            DashLayout[layout.tsx - Dashboard Layout]
-            DashPage[page.tsx - Dashboard Home]
+        subgraph "Dashboard Routes"
+            DashLayout[layout.tsx Dashboard Layout]
+            DashPage[page.tsx Dashboard Home]
             
             subgraph "Inventory Section"
-                InvPage[inventory/page.tsx]
-                InvDetail[inventory/[id]/page.tsx]
+                InvPage["inventory/page.tsx"]
+                InvDetail["inventory/id/page.tsx"]
             end
             
             subgraph "Products Section"
-                ProdList[products/page.tsx]
-                ProdNew[products/new/page.tsx]
-                ProdDetail[products/[id]/page.tsx]
-                ProdEdit[products/[id]/edit/page.tsx]
+                ProdList["products/page.tsx"]
+                ProdNew["products/new/page.tsx"]
+                ProdDetail["products/id/page.tsx"]
+                ProdEdit["products/id/edit/page.tsx"]
             end
             
             subgraph "Channels Section"
-                ChanList[channels/page.tsx]
-                ChanDetail[channels/[id]/page.tsx]
+                ChanList["channels/page.tsx"]
+                ChanDetail["channels/id/page.tsx"]
             end
             
             subgraph "Orders Section"
-                OrderList[orders/page.tsx]
-                OrderDetail[orders/[id]/page.tsx]
+                OrderList["orders/page.tsx"]
+                OrderDetail["orders/id/page.tsx"]
             end
             
             subgraph "Analytics Section"
-                Analytics[analytics/page.tsx]
+                Analytics["analytics/page.tsx"]
             end
         end
         
         subgraph "API Routes"
-            ProductAPI[api/products/route.ts]
-            InventoryAPI[api/inventory/route.ts]
-            OrderAPI[api/orders/route.ts]
-            ChannelAPI[api/channels/route.ts]
-            WebhookAPI[api/webhooks/[channel]/route.ts]
-            SyncAPI[api/sync/route.ts]
+            ProductAPI["api/products/route.ts"]
+            InventoryAPI["api/inventory/route.ts"]
+            OrderAPI["api/orders/route.ts"]
+            ChannelAPI["api/channels/route.ts"]
+            WebhookAPI["api/webhooks/channel/route.ts"]
+            SyncAPI["api/sync/route.ts"]
         end
     end
     
     subgraph "Reusable Components"
-        subgraph "UI Components - shadcn/ui"
+        subgraph "UI Components shadcn"
             Button[Button]
             Table[Table]
             Form[Form]
@@ -452,13 +445,13 @@ graph TB
 
 ```mermaid
 graph LR
-    subgraph "Controllers/API Layer"
+    subgraph "Controllers API Layer"
         API[API Routes]
         SA[Server Actions]
         WH[Webhook Handlers]
     end
     
-    subgraph "Service Layer - Business Logic"
+    subgraph "Service Layer Business Logic"
         subgraph "Inventory Service"
             IS_Reserve[reserveStock]
             IS_Confirm[confirmSale]
@@ -487,7 +480,7 @@ graph LR
     end
     
     subgraph "Channel Adapter Layer"
-        BA[BaseAdapter - Abstract Class]
+        BA[BaseAdapter Abstract Class]
         
         subgraph "Concrete Adapters"
             MLA[MercadoLibreAdapter]
@@ -574,8 +567,8 @@ stateDiagram-v2
     
     Failure --> Retry_Check: Check retry count
     
-    Retry_Check --> PENDING: retry_count < 5
-    Retry_Check --> FAILED: retry_count >= 5
+    Retry_Check --> PENDING: retry_count less than 5
+    Retry_Check --> FAILED: retry_count 5 or more
     
     COMPLETED --> [*]
     FAILED --> Manual_Retry: Admin intervention
@@ -584,11 +577,8 @@ stateDiagram-v2
     note right of PENDING
         Status: PENDING
         retry_count: 0
-        Payload: {
-            externalId,
-            quantity,
-            action
-        }
+        Payload contains
+        externalId and quantity
     end note
     
     note right of PROCESSING
@@ -606,7 +596,7 @@ stateDiagram-v2
     note right of FAILED
         Status: FAILED
         retry_count: 5
-        error_message: "..."
+        error_message set
         Requires manual review
     end note
 ```
@@ -617,44 +607,44 @@ stateDiagram-v2
 graph TB
     Start([New Order Received])
     
-    Start --> CheckWebhook{Webhook already<br/>processed?}
-    CheckWebhook -->|Yes| Return200[Return 200 OK<br/>Idempotent]
-    CheckWebhook -->|No| StartTX[Begin Database<br/>Transaction]
+    Start --> CheckWebhook{Webhook already processed?}
+    CheckWebhook -->|Yes| Return200[Return 200 OK Idempotent]
+    CheckWebhook -->|No| StartTX[Begin Database Transaction]
     
-    StartTX --> LockInventory[Lock Inventory Row<br/>FOR UPDATE]
-    LockInventory --> CheckStock{quantity_available<br/>>= order quantity?}
+    StartTX --> LockInventory[Lock Inventory Row FOR UPDATE]
+    LockInventory --> CheckStock{quantity_available >= order quantity?}
     
     CheckStock -->|No| Rollback[Rollback Transaction]
-    Rollback --> ReturnError[Return Error:<br/>Insufficient Stock]
+    Rollback --> ReturnError[Return Error: Insufficient Stock]
     
-    CheckStock -->|Yes| UpdateInventory[Update Inventory:<br/>- quantity_available<br/>+ quantity_reserved]
+    CheckStock -->|Yes| UpdateInventory[Update Inventory]
     
-    UpdateInventory --> CreateTX[Create Inventory<br/>Transaction Log]
-    CreateTX --> CreateOrder[Create Order<br/>and Order Items]
+    UpdateInventory --> CreateTX[Create Inventory Transaction Log]
+    CreateTX --> CreateOrder[Create Order and Order Items]
     CreateOrder --> CommitTX[Commit Transaction]
     
-    CommitTX --> GetListings[Get All Channel<br/>Listings for Variant]
+    CommitTX --> GetListings[Get All Channel Listings for Variant]
     
-    GetListings --> QueueLoop{For each<br/>channel}
+    GetListings --> QueueLoop{For each channel}
     
-    QueueLoop --> QueueSync[Queue Sync Job:<br/>UPDATE_STOCK]
+    QueueLoop --> QueueSync[Queue Sync Job: UPDATE_STOCK]
     QueueSync --> QueueLoop
     
-    QueueLoop -->|Done| MarkProcessed[Mark Webhook<br/>as Processed]
+    QueueLoop -->|Done| MarkProcessed[Mark Webhook as Processed]
     MarkProcessed --> Return200
     
     Return200 --> Background[Background Worker]
     
     Background --> ProcessQueue[Process Sync Queue]
-    ProcessQueue --> CallAPI[Call Channel API:<br/>Update Stock]
+    ProcessQueue --> CallAPI[Call Channel API: Update Stock]
     
     CallAPI --> APICheck{API Success?}
     
-    APICheck -->|Yes| UpdateSync[Update Sync Job:<br/>Status = COMPLETED]
-    APICheck -->|No| CheckRetry{retry_count<br/>< 5?}
+    APICheck -->|Yes| UpdateSync[Update Sync Job: Status COMPLETED]
+    APICheck -->|No| CheckRetry{retry_count less than 5?}
     
-    CheckRetry -->|Yes| IncrementRetry[Increment retry_count<br/>Status = PENDING]
-    CheckRetry -->|No| MarkFailed[Status = FAILED<br/>Needs Manual Review]
+    CheckRetry -->|Yes| IncrementRetry[Increment retry_count Status PENDING]
+    CheckRetry -->|No| MarkFailed[Status FAILED Needs Manual Review]
     
     UpdateSync --> Done([End])
     IncrementRetry --> Done
@@ -674,21 +664,21 @@ graph TB
 ```mermaid
 graph TB
     subgraph "Root Directory"
-        Root[shoe-inventory/]
+        Root[shoe-inventory]
     end
     
-    subgraph "Source Code - src/"
-        App[app/]
-        Components[components/]
-        Lib[lib/]
-        Actions[actions/]
-        Services[services/]
-        Types[types/]
+    subgraph "Source Code src"
+        App[app]
+        Components[components]
+        Lib[lib]
+        Actions[actions]
+        Services[services]
+        Types[types]
     end
     
-    subgraph "Database - prisma/"
+    subgraph "Database prisma"
         Schema[schema.prisma]
-        Migrations[migrations/]
+        Migrations[migrations]
         Seed[seed.ts]
     end
     
@@ -717,15 +707,15 @@ graph TB
     Root --> EnvExample
     Root --> Docker
     
-    App --> AppRoutes[Routes & Pages]
+    App --> AppRoutes[Routes and Pages]
     App --> APIRoutes[API Routes]
     
-    Components --> UIComps[UI Components<br/>shadcn/ui]
-    Components --> FeatureComps[Feature Components<br/>Inventory, Products, etc.]
+    Components --> UIComps[UI Components shadcn]
+    Components --> FeatureComps[Feature Components Inventory Products etc]
     
     Lib --> PrismaClient[prisma.ts]
     Lib --> Validations[validations.ts]
-    Lib --> ChannelAdapters[channels/]
+    Lib --> ChannelAdapters[channels]
     
     Actions --> ProductAct[product-actions.ts]
     Actions --> InventoryAct[inventory-actions.ts]
@@ -825,20 +815,20 @@ graph TB
     end
     
     subgraph "Vercel Platform"
-        NextApp[Next.js Application<br/>Edge Network]
-        ServerFunctions[Serverless Functions<br/>API Routes + Server Actions]
+        NextApp[Next.js Application Edge Network]
+        ServerFunctions[Serverless Functions API Routes and Server Actions]
     end
     
-    subgraph "Database - Hosted"
-        PostgresManaged[(Managed PostgreSQL<br/>Supabase/Neon/Railway)]
+    subgraph "Database Hosted"
+        PostgresManaged[(Managed PostgreSQL Supabase or Neon or Railway)]
     end
     
-    subgraph "Cache - Optional"
-        RedisManaged[(Managed Redis<br/>Upstash/Railway)]
+    subgraph "Cache Optional"
+        RedisManaged[(Managed Redis Upstash or Railway)]
     end
     
     subgraph "Background Jobs"
-        CronJobs[Vercel Cron Jobs<br/>or separate worker]
+        CronJobs[Vercel Cron Jobs or separate worker]
     end
     
     subgraph "External Services"
@@ -848,8 +838,8 @@ graph TB
         Shein_Service[Shein API]
     end
     
-    subgraph "Monitoring & Logging"
-        Sentry[Sentry<br/>Error Tracking]
+    subgraph "Monitoring and Logging"
+        Sentry[Sentry Error Tracking]
         Analytics[Vercel Analytics]
     end
     
@@ -900,12 +890,4 @@ These diagrams cover:
 9. **Technology Stack Layers** - Tech stack from frontend to database
 10. **Production Deployment** - Cloud deployment architecture
 
-Each diagram provides a different perspective on the system, helping you understand:
-- How data flows through the application
-- How components are organized
-- How services interact
-- How the database is structured
-- How background jobs work
-- How to deploy to production
-
-You can use these diagrams as reference while developing or share them with team members to explain the architecture!
+Each diagram provides a different perspective on the system to help you understand how data flows, components are organized, services interact, the database structure, background jobs work, and production deployment.
