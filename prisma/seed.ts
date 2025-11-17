@@ -3,10 +3,31 @@ import { PrismaClient, Prisma } from '@prisma/client'
 const prisma = new PrismaClient()
 
 async function main() {
-    console.log('🌱 Starting database seed...')
+  console.log('🌱 Starting database seed...')
+
+  // ==================== CLEANUP ====================
+  console.log('🧹 Cleaning up existing data...')
+
+  // Delete in correct order to respect foreign key constraints
+  await prisma.processedWebhook.deleteMany({})
+  await prisma.syncQueue.deleteMany({})
+  await prisma.inventoryTransaction.deleteMany({})
+  await prisma.orderItem.deleteMany({})
+  await prisma.order.deleteMany({})
+  await prisma.channelListing.deleteMany({})
+  await prisma.inventory.deleteMany({})
+  await prisma.variantAttribute.deleteMany({})
+  await prisma.productVariant.deleteMany({})
+  await prisma.productImage.deleteMany({})
+  await prisma.productAttribute.deleteMany({})
+  await prisma.product.deleteMany({})
+  await prisma.category.deleteMany({})
+  await prisma.salesChannel.deleteMany({})
+
+  console.log('✓ Cleanup completed')
 
   // ==================== SALES CHANNELS ====================
-  console.log('Creating sales channels...')
+  console.log('📢 Creating sales channels...')
 
   const shopify = await prisma.salesChannel.upsert({
     where: { name: 'shopify' },
@@ -15,25 +36,55 @@ async function main() {
       name: 'shopify',
       displayName: 'Shopify',
       isActive: true,
+      config: {
+        storeName: 'my-store',
+        apiVersion: '2024-01',
+      },
     },
   })
 
-    // Create Sales Channels
-    console.log('📢 Creating sales channels...')
+  const mercadolibre = await prisma.salesChannel.upsert({
+    where: { name: 'mercadolibre' },
+    update: {},
+    create: {
+      name: 'mercadolibre',
+      displayName: 'Mercado Libre',
+      isActive: true,
+      config: {
+        siteId: 'MLM',
+        apiVersion: 'v1',
+      },
+    },
+  })
 
-    const shopify = await prisma.salesChannel.create({
-        data: {
-            name: 'shopify',
-            displayName: 'Shopify',
-            isActive: true,
-            config: {
-                storeName: 'my-store',
-                apiVersion: '2024-01',
-            },
-        },
-    })
+  const amazon = await prisma.salesChannel.upsert({
+    where: { name: 'amazon' },
+    update: {},
+    create: {
+      name: 'amazon',
+      displayName: 'Amazon',
+      isActive: true,
+      config: {
+        marketplace: 'US',
+        apiVersion: '2021-06-01',
+      },
+    },
+  })
 
-  console.log('✓ Created sales channels')
+  const shein = await prisma.salesChannel.upsert({
+    where: { name: 'shein' },
+    update: {},
+    create: {
+      name: 'shein',
+      displayName: 'SHEIN',
+      isActive: true,
+      config: {
+        region: 'US',
+      },
+    },
+  })
+
+  console.log('✓ Created 4 sales channels')
 
   // ==================== CATEGORIES ====================
   console.log('Creating categories...')
@@ -245,8 +296,11 @@ async function main() {
                 warehouseLocation: 'A1-04',
               },
             },
-        },
-    })
+          },
+        ],
+      },
+    },
+  })
 
   console.log('✓ Created Nike Air Max 90')
 
@@ -607,25 +661,12 @@ async function main() {
     if (Math.random() > 0.3) {
       await prisma.channelListing.create({
         data: {
-            channelId: mercadolibre.id,
-            externalOrderId: 'ml_67890',
-            status: 'SHIPPED',
-            totalAmount: new Prisma.Decimal('207.00'),
-            customerInfo: {
-                name: 'María García',
-                email: 'maria@example.com',
-                address: 'Av. Insurgentes 456, CDMX, Mexico',
-            },
-            items: {
-                create: [
-                    {
-                        variantId: adidasUltraboost.variants[0].id,
-                        quantity: 1,
-                        unitPrice: new Prisma.Decimal('207.00'),
-                        subtotal: new Prisma.Decimal('207.00'),
-                    },
-                ],
-            },
+          variantId: variant.id,
+          channelId: mercadolibre.id,
+          externalId: `ml_${variant.sku}`,
+          channelSku: variant.sku,
+          price: variant.product.basePrice.toNumber() * 1.10, // 10% markup
+          isActive: true,
         },
       })
     }
@@ -638,7 +679,21 @@ async function main() {
           channelId: amazon.id,
           externalId: `amz_${variant.sku}`,
           channelSku: variant.sku,
-          price: variant.product.basePrice * 1.15, // 15% markup
+          price: variant.product.basePrice.toNumber() * 1.15, // 15% markup
+          isActive: true,
+        },
+      })
+    }
+
+    // List on SHEIN (30% of products)
+    if (Math.random() > 0.7) {
+      await prisma.channelListing.create({
+        data: {
+          variantId: variant.id,
+          channelId: shein.id,
+          externalId: `shein_${variant.sku}`,
+          channelSku: variant.sku,
+          price: variant.product.basePrice.toNumber() * 1.05, // 5% markup
           isActive: true,
         },
       })
@@ -745,11 +800,11 @@ async function main() {
 
   console.log('\n✅ Seed completed successfully!')
   console.log('\n📊 Summary:')
-  console.log('  - 3 Sales Channels')
+  console.log('  - 4 Sales Channels (Shopify, Mercado Libre, Amazon, SHEIN)')
   console.log('  - 8 Categories (4 parent + 4 subcategories)')
   console.log('  - 5 Products across multiple categories')
   console.log('  - 17 Product Variants with flexible attributes')
-  console.log('  - Multiple Channel Listings')
+  console.log('  - Multiple Channel Listings across all channels')
   console.log('  - 3 Sample Orders')
 }
 
