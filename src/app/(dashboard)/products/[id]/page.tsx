@@ -6,7 +6,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge'
 import { getProduct } from '@/actions/product-actions'
 import { getChannels } from '@/actions/channel-actions'
-import { PublishToChannels } from '@/components/products/publish-to-channels'
+import { PublishVariantsToChannels } from '@/components/products/publish-variants-to-channels'
+import { EditVariantDialog } from '@/components/products/edit-variant-dialog'
 import { formatCurrency } from '@/lib/utils'
 import { ArrowLeft, Edit, Package, Warehouse } from 'lucide-react'
 
@@ -69,11 +70,12 @@ export default async function ProductPage({ params }: ProductPageProps) {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <PublishToChannels
+          <PublishVariantsToChannels
             productId={product.id}
             productName={product.name}
+            basePrice={Number(product.basePrice)}
+            variants={product.variants}
             availableChannels={channels}
-            publishedChannels={publishedChannels}
           />
           <Link href={`/products/${product.id}/edit`}>
             <Button variant="outline">
@@ -197,6 +199,8 @@ export default async function ProductPage({ params }: ProductPageProps) {
                   <TableHead>Sold</TableHead>
                   <TableHead>Location</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Channels</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -244,6 +248,26 @@ export default async function ProductPage({ params }: ProductPageProps) {
                         ) : (
                           <Badge variant="success">In Stock</Badge>
                         )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {variant.channelListings && variant.channelListings.length > 0 ? (
+                            variant.channelListings.map((listing) => (
+                              <Badge
+                                key={listing.id}
+                                variant={listing.isActive ? 'success' : 'secondary'}
+                                className="text-xs"
+                              >
+                                {listing.channel.name}
+                              </Badge>
+                            ))
+                          ) : (
+                            <span className="text-xs text-muted-foreground">Not published</span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <EditVariantDialog variant={variant} productId={product.id} />
                       </TableCell>
                     </TableRow>
                   )
