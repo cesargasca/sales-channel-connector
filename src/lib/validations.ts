@@ -1,21 +1,60 @@
 import { z } from 'zod'
 
-// Product validations
-export const productSchema = z.object({
-  modelName: z.string().min(1, 'Model name is required'),
+// Category validations
+export const categorySchema = z.object({
+  name: z.string().min(1, 'Category name is required'),
+  slug: z.string().min(1, 'Slug is required').regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Slug must contain only lowercase letters, numbers, and hyphens'),
   description: z.string().optional(),
-  basePrice: z.number().positive('Price must be positive'),
   imageUrl: z.string().url('Must be a valid URL').optional().or(z.literal('')),
+  isActive: z.boolean().default(true),
+  parentId: z.string().uuid().optional().nullable(),
 })
 
+// Product attribute validation
+export const attributeSchema = z.object({
+  key: z.string().min(1, 'Attribute key is required'),
+  value: z.string().min(1, 'Attribute value is required'),
+})
+
+// Product image validation
+export const productImageSchema = z.object({
+  url: z.string().url('Must be a valid URL'),
+  altText: z.string().optional(),
+  position: z.number().int().min(0).default(0),
+  isPrimary: z.boolean().default(false),
+})
+
+// Product validations (updated for category support)
+export const productSchema = z.object({
+  categoryId: z.string().uuid('Category is required'),
+  name: z.string().min(1, 'Product name is required'),
+  modelName: z.string().optional(), // Legacy field
+  description: z.string().optional(),
+  basePrice: z.number().positive('Price must be positive'),
+  imageUrl: z.string().url('Must be a valid URL').optional().or(z.literal('')), // Legacy field
+  isActive: z.boolean().default(true),
+  attributes: z.array(attributeSchema).default([]),
+  images: z.array(productImageSchema).optional().default([]),
+})
+
+// Variant validations (updated for flexible attributes)
 export const variantSchema = z.object({
-  size: z.string().min(1, 'Size is required'),
-  color: z.string().min(1, 'Color is required'),
+  sku: z.string().min(1, 'SKU is required'),
+  size: z.string().optional(), // Legacy field
+  color: z.string().optional(), // Legacy field
   barcode: z.string().optional(),
+  attributes: z.array(attributeSchema).default([]),
 })
 
 export const createVariantSchema = variantSchema.extend({
   productId: z.string().uuid(),
+  inventory: z.object({
+    quantityAvailable: z.number().int().min(0).default(0),
+    quantityReserved: z.number().int().min(0).default(0),
+    quantitySold: z.number().int().min(0).default(0),
+    minStockThreshold: z.number().int().min(0).default(5),
+    warehouseLocation: z.string().optional(),
+  }).optional(),
 })
 
 // Inventory validations
@@ -69,6 +108,9 @@ export const updateOrderStatusSchema = z.object({
   status: z.enum(['PENDING', 'CONFIRMED', 'SHIPPED', 'DELIVERED', 'CANCELLED', 'RETURNED']),
 })
 
+export type CategoryInput = z.infer<typeof categorySchema>
+export type AttributeInput = z.infer<typeof attributeSchema>
+export type ProductImageInput = z.infer<typeof productImageSchema>
 export type ProductInput = z.infer<typeof productSchema>
 export type VariantInput = z.infer<typeof variantSchema>
 export type CreateVariantInput = z.infer<typeof createVariantSchema>
