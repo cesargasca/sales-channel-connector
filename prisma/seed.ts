@@ -1,9 +1,9 @@
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient, Prisma } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
 async function main() {
-  console.log('Starting seed...')
+    console.log('🌱 Starting database seed...')
 
   // ==================== SALES CHANNELS ====================
   console.log('Creating sales channels...')
@@ -18,25 +18,20 @@ async function main() {
     },
   })
 
-  const mercadolibre = await prisma.salesChannel.upsert({
-    where: { name: 'mercadolibre' },
-    update: {},
-    create: {
-      name: 'mercadolibre',
-      displayName: 'Mercado Libre',
-      isActive: true,
-    },
-  })
+    // Create Sales Channels
+    console.log('📢 Creating sales channels...')
 
-  const amazon = await prisma.salesChannel.upsert({
-    where: { name: 'amazon' },
-    update: {},
-    create: {
-      name: 'amazon',
-      displayName: 'Amazon',
-      isActive: true,
-    },
-  })
+    const shopify = await prisma.salesChannel.create({
+        data: {
+            name: 'shopify',
+            displayName: 'Shopify',
+            isActive: true,
+            config: {
+                storeName: 'my-store',
+                apiVersion: '2024-01',
+            },
+        },
+    })
 
   console.log('✓ Created sales channels')
 
@@ -250,11 +245,8 @@ async function main() {
                 warehouseLocation: 'A1-04',
               },
             },
-          },
-        ],
-      },
-    },
-  })
+        },
+    })
 
   console.log('✓ Created Nike Air Max 90')
 
@@ -615,12 +607,25 @@ async function main() {
     if (Math.random() > 0.3) {
       await prisma.channelListing.create({
         data: {
-          variantId: variant.id,
-          channelId: mercadolibre.id,
-          externalId: `ml_${variant.sku}`,
-          channelSku: variant.sku,
-          price: variant.product.basePrice * 1.1, // 10% markup
-          isActive: true,
+            channelId: mercadolibre.id,
+            externalOrderId: 'ml_67890',
+            status: 'SHIPPED',
+            totalAmount: new Prisma.Decimal('207.00'),
+            customerInfo: {
+                name: 'María García',
+                email: 'maria@example.com',
+                address: 'Av. Insurgentes 456, CDMX, Mexico',
+            },
+            items: {
+                create: [
+                    {
+                        variantId: adidasUltraboost.variants[0].id,
+                        quantity: 1,
+                        unitPrice: new Prisma.Decimal('207.00'),
+                        subtotal: new Prisma.Decimal('207.00'),
+                    },
+                ],
+            },
         },
       })
     }
@@ -749,10 +754,11 @@ async function main() {
 }
 
 main()
-  .catch((e) => {
-    console.error('Error during seed:', e)
-    process.exit(1)
-  })
-  .finally(async () => {
-    await prisma.$disconnect()
-  })
+    .then(async () => {
+        await prisma.$disconnect()
+    })
+    .catch(async (e) => {
+        console.error('❌ Error seeding database:', e)
+        await prisma.$disconnect()
+        process.exit(1)
+    })
