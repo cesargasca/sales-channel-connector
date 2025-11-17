@@ -5,6 +5,8 @@ import { revalidatePath } from 'next/cache'
 import { productSchema, createVariantSchema } from '@/lib/validations'
 import { generateSKU as generateSKUFromHelper } from '@/lib/product-helpers'
 import { CreateProductInput, UpdateProductInput } from '@/types/product'
+import { ChannelSyncService } from '@/services/channel-sync-service'
+import { SyncAction } from '@prisma/client'
 
 /**
  * Get all products with category and variant information
@@ -478,6 +480,157 @@ export async function deleteVariant(id: string) {
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to delete variant',
+    }
+  }
+}
+
+/**
+ * Publish a product to selected channels
+ */
+export async function publishProductToChannels(
+  productId: string,
+  channelIds: string[]
+) {
+  try {
+    // Get product with all variants
+    const product = await prisma.product.findUnique({
+      where: { id: productId },
+      include: {
+        category: true,
+        attributes: true,
+        images: {
+          orderBy: {
+            position: 'asc',
+          },
+        },
+        variants: {
+          include: {
+            attributes: true,
+            inventory: true,
+            channelListings: {
+              select: {
+                channelId: true,
+              },
+            },
+          },
+        },
+      },
+    })
+
+    if (!product) {
+      throw new Error('Product not found')
+    }
+
+    if (product.variants.length === 0) {
+      throw new Error('Product has no variants to publish')
+    }
+
+    // Get channels to verify they exist and are active
+    const channels = await prisma.salesChannel.findMany({
+      where: {
+        id: { in: channelIds },
+        isActive: true,
+      },
+    })
+
+    if (channels.length === 0) {
+      throw new Error('No active channels found')
+    }
+
+    const results = []
+
+    // Publish each variant to each channel
+    for (const variant of product.variants) {
+      for (const channel of channels) {
+        // Skip if listing already exists
+        const existingListing = variant.channelListings.find(
+          (listing) => listing.channelId === channel.id
+        )
+
+        if (existingListing) {
+          results.push({
+            variantId: variant.id,
+            channelId: channel.id,
+            status: 'skipped',
+            message: 'Listing already exists',
+          })
+          continue
+        }
+
+        // Create channel listing
+        const listing = await prisma.channelListing.create({
+          data: {
+            variantId: variant.id,
+            channelId: channel.id,
+            price: product.basePrice,
+            isActive: true,
+          },
+        })
+
+        // Prepare payload for channel adapter
+        const payload = {
+          product: {
+            id: product.id,
+            name: product.name,
+            description: product.description,
+            category: product.category.name,
+            images: product.images.map((img) => ({
+              url: img.url,
+              altText: img.altText,
+              position: img.position,
+            })),
+            attributes: product.attributes.reduce((acc, attr) => {
+              acc[attr.key] = attr.value
+              return acc
+            }, {} as Record<string, string>),
+          },
+          variant: {
+            id: variant.id,
+            sku: variant.sku,
+            barcode: variant.barcode,
+            price: product.basePrice.toString(),
+            inventory: variant.inventory?.quantityAvailable || 0,
+            attributes: variant.attributes.reduce((acc, attr) => {
+              acc[attr.key] = attr.value
+              return acc
+            }, {} as Record<string, string>),
+          },
+          listingId: listing.id,
+        }
+
+        // Queue sync job
+        await ChannelSyncService.queueSync(
+          variant.id,
+          channel.id,
+          SyncAction.CREATE_LISTING,
+          payload
+        )
+
+        results.push({
+          variantId: variant.id,
+          channelId: channel.id,
+          status: 'queued',
+          message: 'Publishing job queued',
+        })
+      }
+    }
+
+    revalidatePath(`/products/${productId}`)
+    revalidatePath('/channels')
+
+    return {
+      success: true,
+      results,
+      message: `Queued ${results.filter(r => r.status === 'queued').length} publishing jobs`,
+    }
+  } catch (error) {
+    console.error('Publish product to channels error:', error)
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : 'Failed to publish product to channels',
     }
   }
 }

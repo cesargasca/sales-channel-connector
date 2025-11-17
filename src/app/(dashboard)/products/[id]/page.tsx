@@ -5,6 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { getProduct } from '@/actions/product-actions'
+import { getChannels } from '@/actions/channel-actions'
+import { PublishToChannels } from '@/components/products/publish-to-channels'
 import { formatCurrency } from '@/lib/utils'
 import { ArrowLeft, Edit, Package, Warehouse } from 'lucide-react'
 
@@ -20,6 +22,26 @@ export default async function ProductPage({ params }: ProductPageProps) {
   if (!product) {
     notFound()
   }
+
+  // Get all available channels
+  const channels = await getChannels()
+
+  // Get unique published channels from all variants
+  const publishedChannelsMap = new Map<string, string>()
+  product.variants.forEach((variant) => {
+    variant.channelListings?.forEach((listing) => {
+      if (!publishedChannelsMap.has(listing.channel.id)) {
+        publishedChannelsMap.set(listing.channel.id, listing.channel.name)
+      }
+    })
+  })
+
+  const publishedChannels = Array.from(publishedChannelsMap.entries()).map(
+    ([channelId, channelName]) => ({
+      channelId,
+      channelName,
+    })
+  )
 
   // Calculate total stock across all variants
   const totalStock = product.variants.reduce(
@@ -47,6 +69,12 @@ export default async function ProductPage({ params }: ProductPageProps) {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <PublishToChannels
+            productId={product.id}
+            productName={product.name}
+            availableChannels={channels}
+            publishedChannels={publishedChannels}
+          />
           <Link href={`/products/${product.id}/edit`}>
             <Button variant="outline">
               <Edit className="mr-2 h-4 w-4" />

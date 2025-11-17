@@ -112,6 +112,7 @@ export class ChannelSyncService {
         })
 
         const adapter = getChannelAdapter(job.channel.name, job.channel.apiCredentials)
+        let externalId: string | undefined
 
         switch (job.action) {
           case SyncAction.UPDATE_STOCK:
@@ -121,10 +122,27 @@ export class ChannelSyncService {
             await adapter.updatePrice(job.payload.externalId, job.payload.price)
             break
           case SyncAction.CREATE_LISTING:
-            await adapter.createListing(job.payload)
+            externalId = await adapter.createListing(job.payload)
+            // Update channel listing with external ID
+            if (externalId && job.payload.listingId) {
+              await prisma.channelListing.update({
+                where: { id: job.payload.listingId },
+                data: {
+                  externalId,
+                  lastSyncedAt: new Date(),
+                },
+              })
+            }
             break
           case SyncAction.DELETE_LISTING:
             await adapter.deleteListing(job.payload.externalId)
+            // Mark listing as inactive
+            if (job.payload.listingId) {
+              await prisma.channelListing.update({
+                where: { id: job.payload.listingId },
+                data: { isActive: false },
+              })
+            }
             break
         }
 
@@ -136,7 +154,7 @@ export class ChannelSyncService {
           },
         })
 
-        results.push({ id: job.id, success: true })
+        results.push({ id: job.id, success: true, externalId })
       } catch (error) {
         await prisma.syncQueue.update({
           where: { id: job.id },
