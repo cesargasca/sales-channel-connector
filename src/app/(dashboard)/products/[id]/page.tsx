@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge'
 import { getProduct } from '@/actions/product-actions'
 import { formatCurrency } from '@/lib/utils'
-import { ArrowLeft, Package, Warehouse } from 'lucide-react'
+import { ArrowLeft, Edit, Package, Warehouse } from 'lucide-react'
 
 interface ProductPageProps {
   params: {
@@ -46,9 +46,17 @@ export default async function ProductPage({ params }: ProductPageProps) {
             </p>
           </div>
         </div>
-        <Badge variant={product.isActive ? 'success' : 'secondary'} className="h-8 px-4">
-          {product.isActive ? 'Active' : 'Inactive'}
-        </Badge>
+        <div className="flex items-center gap-2">
+          <Link href={`/products/${product.id}/edit`}>
+            <Button variant="outline">
+              <Edit className="mr-2 h-4 w-4" />
+              Edit Product
+            </Button>
+          </Link>
+          <Badge variant={product.isActive ? 'success' : 'secondary'} className="h-8 px-4">
+            {product.isActive ? 'Active' : 'Inactive'}
+          </Badge>
+        </div>
       </div>
 
       {/* Product Information */}

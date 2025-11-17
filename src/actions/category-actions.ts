@@ -332,7 +332,7 @@ async function checkCircularHierarchy(
 /**
  * Generate slug from category name
  */
-export function generateSlug(name: string): string {
+export async function generateSlug(name: string): Promise<string> {
   return name
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
